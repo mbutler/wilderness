@@ -16,7 +16,7 @@ io.sockets.on("connection", function (socket) {
     var mySelf = entities[myNumber] = [myNumber, INITIAL_X, INITIAL_Y, INITIAL_VEL_X, INITIAL_VEL_Y];
 
     //Send the initial position and ID to connecting player
-console.log(myNumber + ' sent: ' + 'I,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
+    console.log(myNumber + ' sent: ' + 'I,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
     socket.send('I,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
     //Send to conencting client the current state of all the other players
     for (var entity_idx = 0; entity_idx < entities.length; entity_idx++) { //send initial update  

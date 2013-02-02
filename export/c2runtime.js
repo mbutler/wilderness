@@ -9014,6 +9014,599 @@ cr.do_cmp = function (x, cmp, y)
 cr.shaders = {};
 ;
 ;
+cr.plugins_.Arr = function(runtime)
+{
+	this.runtime = runtime;
+};
+(function ()
+{
+	var pluginProto = cr.plugins_.Arr.prototype;
+	pluginProto.Type = function(plugin)
+	{
+		this.plugin = plugin;
+		this.runtime = plugin.runtime;
+	};
+	var typeProto = pluginProto.Type.prototype;
+	typeProto.onCreate = function()
+	{
+	};
+	pluginProto.Instance = function(type)
+	{
+		this.type = type;
+		this.runtime = type.runtime;
+	};
+	var instanceProto = pluginProto.Instance.prototype;
+	instanceProto.onCreate = function()
+	{
+		this.cx = this.properties[0];
+		this.cy = this.properties[1];
+		this.cz = this.properties[2];
+		if (!this.arr)
+			this.arr = [];
+		var a = this.arr;
+		a.length = this.cx;
+		var x, y, z;
+		for (x = 0; x < this.cx; x++)
+		{
+			if (!a[x])
+				a[x] = [];
+			a[x].length = this.cy;
+			for (y = 0; y < this.cy; y++)
+			{
+				if (!a[x][y])
+					a[x][y] = [];
+				a[x][y].length = this.cz;
+				for (z = 0; z < this.cz; z++)
+					a[x][y][z] = 0;
+			}
+		}
+		this.forX = 0;
+		this.forY = 0;
+		this.forZ = 0;
+	};
+	instanceProto.at = function (x, y, z)
+	{
+		x = Math.floor(x);
+		y = Math.floor(y);
+		z = Math.floor(z);
+		if (isNaN(x) || x < 0 || x > this.cx - 1)
+			return 0;
+		if (isNaN(y) || y < 0 || y > this.cy - 1)
+			return 0;
+		if (isNaN(z) || z < 0 || z > this.cz - 1)
+			return 0;
+		return this.arr[x][y][z];
+	};
+	instanceProto.set = function (x, y, z, val)
+	{
+		x = Math.floor(x);
+		y = Math.floor(y);
+		z = Math.floor(z);
+		if (isNaN(x) || x < 0 || x > this.cx - 1)
+			return;
+		if (isNaN(y) || y < 0 || y > this.cy - 1)
+			return;
+		if (isNaN(z) || z < 0 || z > this.cz - 1)
+			return;
+		this.arr[x][y][z] = val;
+	};
+	instanceProto.getAsJSON = function ()
+	{
+		return JSON.stringify({
+			"c2array": true,
+			"size": [this.cx, this.cy, this.cz],
+			"data": this.arr
+		});
+	};
+	function Cnds() {};
+	Cnds.prototype.CompareX = function (x, cmp, val)
+	{
+		return cr.do_cmp(this.at(x, 0, 0), cmp, val);
+	};
+	Cnds.prototype.CompareXY = function (x, y, cmp, val)
+	{
+		return cr.do_cmp(this.at(x, y, 0), cmp, val);
+	};
+	Cnds.prototype.CompareXYZ = function (x, y, z, cmp, val)
+	{
+		return cr.do_cmp(this.at(x, y, z), cmp, val);
+	};
+	instanceProto.doForEachTrigger = function (current_event)
+	{
+		this.runtime.pushCopySol(current_event.solModifiers);
+		current_event.retrigger();
+		this.runtime.popSol(current_event.solModifiers);
+	};
+	Cnds.prototype.ArrForEach = function (dims)
+	{
+        var current_event = this.runtime.getCurrentEventStack().current_event;
+		this.forX = 0;
+		this.forY = 0;
+		this.forZ = 0;
+		switch (dims) {
+		case 0:
+			for (this.forX = 0; this.forX < this.cx; this.forX++)
+			{
+				for (this.forY = 0; this.forY < this.cy; this.forY++)
+				{
+					for (this.forZ = 0; this.forZ < this.cz; this.forZ++)
+					{
+						this.doForEachTrigger(current_event);
+					}
+				}
+			}
+			break;
+		case 1:
+			for (this.forX = 0; this.forX < this.cx; this.forX++)
+			{
+				for (this.forY = 0; this.forY < this.cy; this.forY++)
+				{
+					this.doForEachTrigger(current_event);
+				}
+			}
+			break;
+		case 2:
+			for (this.forX = 0; this.forX < this.cx; this.forX++)
+			{
+				this.doForEachTrigger(current_event);
+			}
+			break;
+		}
+		this.forX = 0;
+		this.forY = 0;
+		this.forZ = 0;
+		return false;
+	};
+	Cnds.prototype.CompareCurrent = function (cmp, val)
+	{
+		return cr.do_cmp(this.at(this.forX, this.forY, this.forZ), cmp, val);
+	};
+	Cnds.prototype.Contains = function(val)
+	{
+		var x, y, z;
+		for (x = 0; x < this.cx; x++)
+		{
+			for (y = 0; y < this.cy; y++)
+			{
+				for (z = 0; z < this.cz; z++)
+				{
+					if (this.arr[x][y][z] === val)
+						return true;
+				}
+			}
+		}
+		return false;
+	};
+	Cnds.prototype.IsEmpty = function ()
+	{
+		return this.cx === 0 || this.cy === 0 || this.cz === 0;
+	};
+	pluginProto.cnds = new Cnds();
+	function Acts() {};
+	Acts.prototype.Clear = function ()
+	{
+		var x, y, z;
+		for (x = 0; x < this.cx; x++)
+			for (y = 0; y < this.cy; y++)
+				for (z = 0; z < this.cz; z++)
+					this.arr[x][y][z] = 0;
+	};
+	Acts.prototype.SetSize = function (w, h, d)
+	{
+		if (w < 0) w = 0;
+		if (h < 0) h = 0;
+		if (d < 0) d = 0;
+		if (this.cx === w && this.cy === h && this.cz === d)
+			return;		// no change
+		this.cx = w;
+		this.cy = h;
+		this.cz = d;
+		var x, y, z;
+		var a = this.arr;
+		a.length = w;
+		for (x = 0; x < this.cx; x++)
+		{
+			if (cr.is_undefined(a[x]))
+				a[x] = [];
+			a[x].length = h;
+			for (y = 0; y < this.cy; y++)
+			{
+				if (cr.is_undefined(a[x][y]))
+					a[x][y] = [];
+				a[x][y].length = d;
+				for (z = 0; z < this.cz; z++)
+				{
+					if (cr.is_undefined(a[x][y][z]))
+						a[x][y][z] = 0;
+				}
+			}
+		}
+	};
+	Acts.prototype.SetX = function (x, val)
+	{
+		this.set(x, 0, 0, val);
+	};
+	Acts.prototype.SetXY = function (x, y, val)
+	{
+		this.set(x, y, 0, val);
+	};
+	Acts.prototype.SetXYZ = function (x, y, z, val)
+	{
+		this.set(x, y, z, val);
+	};
+	Acts.prototype.Push = function (where, value, axis)
+	{
+		var x = 0, y = 0, z = 0;
+		var a = this.arr;
+		switch (axis) {
+		case 0:	// X axis
+			if (where === 0)	// back
+			{
+				x = a.length;
+				a.push([]);
+			}
+			else				// front
+			{
+				x = 0;
+				a.unshift([]);
+			}
+			a[x].length = this.cy;
+			for ( ; y < this.cy; y++)
+			{
+				a[x][y] = [];
+				a[x][y].length = this.cz;
+				for (z = 0; z < this.cz; z++)
+					a[x][y][z] = value;
+			}
+			this.cx++;
+			break;
+		case 1: // Y axis
+			for ( ; x < this.cx; x++)
+			{
+				if (where === 0)	// back
+				{
+					y = a[x].length;
+					a[x].push([]);
+				}
+				else				// front
+				{
+					y = 0;
+					a[x].unshift([]);
+				}
+				a[x][y].length = this.cz;
+				for (z = 0; z < this.cz; z++)
+					a[x][y][z] = value;
+			}
+			this.cy++;
+			break;
+		case 2:	// Z axis
+			for ( ; x < this.cx; x++)
+			{
+				for (y = 0; y < this.cy; y++)
+				{
+					if (where === 0)	// back
+					{
+						a[x][y].push(value);
+					}
+					else				// front
+					{
+						a[x][y].unshift(value);
+					}
+				}
+			}
+			this.cz++;
+			break;
+		}
+	};
+	Acts.prototype.Pop = function (where, axis)
+	{
+		var x = 0, y = 0, z = 0;
+		var a = this.arr;
+		switch (axis) {
+		case 0:	// X axis
+			if (this.cx === 0)
+				break;
+			if (where === 0)	// back
+			{
+				a.pop();
+			}
+			else				// front
+			{
+				a.shift();
+			}
+			this.cx--;
+			break;
+		case 1: // Y axis
+			if (this.cy === 0)
+				break;
+			for ( ; x < this.cx; x++)
+			{
+				if (where === 0)	// back
+				{
+					a[x].pop();
+				}
+				else				// front
+				{
+					a[x].shift();
+				}
+			}
+			this.cy--;
+			break;
+		case 2:	// Z axis
+			if (this.cz === 0)
+				break;
+			for ( ; x < this.cx; x++)
+			{
+				for (y = 0; y < this.cy; y++)
+				{
+					if (where === 0)	// back
+					{
+						a[x][y].pop();
+					}
+					else				// front
+					{
+						a[x][y].shift();
+					}
+				}
+			}
+			this.cz--;
+			break;
+		}
+	};
+	Acts.prototype.Reverse = function (axis)
+	{
+		var x = 0, y = 0, z = 0;
+		var a = this.arr;
+		if (this.cx === 0 || this.cy === 0 || this.cz === 0)
+			return;		// no point reversing empty array
+		switch (axis) {
+		case 0:	// X axis
+			a.reverse();
+			break;
+		case 1: // Y axis
+			for ( ; x < this.cx; x++)
+				a[x].reverse();
+			break;
+		case 2:	// Z axis
+			for ( ; x < this.cx; x++)
+				for (y = 0; y < this.cy; y++)
+					a[x][y].reverse();
+			this.cz--;
+			break;
+		}
+	};
+	function compareValues(va, vb)
+	{
+		if (cr.is_number(va) && cr.is_number(vb))
+			return va - vb;
+		else
+		{
+			var sa = "" + va;
+			var sb = "" + vb;
+			if (sa < sb)
+				return -1;
+			else if (sa > sb)
+				return 1;
+			else
+				return 0;
+		}
+	}
+	Acts.prototype.Sort = function (axis)
+	{
+		var x = 0, y = 0, z = 0;
+		var a = this.arr;
+		if (this.cx === 0 || this.cy === 0 || this.cz === 0)
+			return;		// no point sorting empty array
+		switch (axis) {
+		case 0:	// X axis
+			a.sort(function (a, b) {
+				return compareValues(a[0][0], b[0][0]);
+			});
+			break;
+		case 1: // Y axis
+			for ( ; x < this.cx; x++)
+			{
+				a[x].sort(function (a, b) {
+					return compareValues(a[0], b[0]);
+				});
+			}
+			break;
+		case 2:	// Z axis
+			for ( ; x < this.cx; x++)
+			{
+				for (y = 0; y < this.cy; y++)
+				{
+					a[x][y].sort(compareValues);
+				}
+			}
+			break;
+		}
+	};
+	Acts.prototype.Delete = function (index, axis)
+	{
+		var x = 0, y = 0, z = 0;
+		index = Math.floor(index);
+		var a = this.arr;
+		if (index < 0)
+			return;
+		switch (axis) {
+		case 0:	// X axis
+			if (index >= this.cx)
+				break;
+			a.splice(index, 1);
+			this.cx--;
+			break;
+		case 1: // Y axis
+			if (index >= this.cy)
+				break;
+			for ( ; x < this.cx; x++)
+			{
+				a[x].splice(index, 1);
+			}
+			this.cy--;
+			break;
+		case 2:	// Z axis
+			if (index >= this.cz)
+				break;
+			for ( ; x < this.cx; x++)
+			{
+				for (y = 0; y < this.cy; y++)
+				{
+					a[x][y].splice(index, 1);
+				}
+			}
+			this.cz--;
+			break;
+		}
+	};
+	Acts.prototype.Insert = function (value, index, axis)
+	{
+		var x = 0, y = 0, z = 0;
+		index = Math.floor(index);
+		var a = this.arr;
+		if (index < 0)
+			return;
+		switch (axis) {
+		case 0:	// X axis
+			if (index > this.cx)
+				return;
+			x = index;
+			a.splice(x, 0, []);
+			a[x].length = this.cy;
+			for ( ; y < this.cy; y++)
+			{
+				a[x][y] = [];
+				a[x][y].length = this.cz;
+				for (z = 0; z < this.cz; z++)
+					a[x][y][z] = value;
+			}
+			this.cx++;
+			break;
+		case 1: // Y axis
+			if (index > this.cy)
+				return;
+			for ( ; x < this.cx; x++)
+			{
+				y = index;
+				a[x].splice(y, 0, []);
+				a[x][y].length = this.cz;
+				for (z = 0; z < this.cz; z++)
+					a[x][y][z] = value;
+			}
+			this.cy++;
+			break;
+		case 2:	// Z axis
+			if (index > this.cz)
+				return;
+			for ( ; x < this.cx; x++)
+			{
+				for (y = 0; y < this.cy; y++)
+				{
+					a[x][y].splice(index, 0, value);
+				}
+			}
+			this.cz++;
+			break;
+		}
+	};
+	Acts.prototype.JSONLoad = function (json_)
+	{
+		var o;
+		try {
+			o = JSON.parse(json_);
+		}
+		catch(e) { return; }
+		if (!o["c2array"])		// presumably not a c2array object
+			return;
+		var sz = o["size"];
+		this.cx = sz[0];
+		this.cy = sz[1];
+		this.cz = sz[2];
+		this.arr = o["data"];
+	};
+	Acts.prototype.JSONDownload = function (axes)
+	{
+		var str = 'data:text/html,' + encodeURIComponent("<p><a download='data.json' href='data:application/json,"
+				+ this.getAsJSON()
+				+ "'>Download link</a></p><p>Left click the link in Chrome, or in other browsers right-click and select 'Save link'</p>");
+		window.open(str);
+	};
+	pluginProto.acts = new Acts();
+	function Exps() {};
+	Exps.prototype.At = function (ret, x, y_, z_)
+	{
+		var y = y_ || 0;
+		var z = z_ || 0;
+		ret.set_any(this.at(x, y, z));
+	};
+	Exps.prototype.Width = function (ret)
+	{
+		ret.set_int(this.cx);
+	};
+	Exps.prototype.Height = function (ret)
+	{
+		ret.set_int(this.cy);
+	};
+	Exps.prototype.Depth = function (ret)
+	{
+		ret.set_int(this.cz);
+	};
+	Exps.prototype.CurX = function (ret)
+	{
+		ret.set_int(this.forX);
+	};
+	Exps.prototype.CurY = function (ret)
+	{
+		ret.set_int(this.forY);
+	};
+	Exps.prototype.CurZ = function (ret)
+	{
+		ret.set_int(this.forZ);
+	};
+	Exps.prototype.CurValue = function (ret)
+	{
+		ret.set_any(this.at(this.forX, this.forY, this.forZ));
+	};
+	Exps.prototype.Front = function (ret)
+	{
+		ret.set_any(this.at(0, 0, 0));
+	};
+	Exps.prototype.Back = function (ret)
+	{
+		ret.set_any(this.at(this.cx - 1, 0, 0));
+	};
+	Exps.prototype.IndexOf = function (ret, v)
+	{
+		for (var i = 0; i < this.cx; i++)
+		{
+			if (this.arr[i][0][0] === v)
+			{
+				ret.set_int(i);
+				return;
+			}
+		}
+		ret.set_int(-1);
+	};
+	Exps.prototype.LastIndexOf = function (ret, v)
+	{
+		for (var i = this.cx - 1; i >= 0; i--)
+		{
+			if (this.arr[i][0][0] === v)
+			{
+				ret.set_int(i);
+				return;
+			}
+		}
+		ret.set_int(-1);
+	};
+	Exps.prototype.AsJSON = function (ret)
+	{
+		ret.set_string(this.getAsJSON());
+	};
+	pluginProto.exps = new Exps();
+}());
+;
+;
 cr.plugins_.Keyboard = function(runtime)
 {
 	this.runtime = runtime;
@@ -13260,6 +13853,18 @@ cr.getProjectModel = function() { return [
 	null,
 	[
 	[
+		cr.plugins_.Mouse,
+		true,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false
+	]
+,	[
 		cr.plugins_.Rex_SLGBoard,
 		false,
 		false,
@@ -13332,8 +13937,8 @@ cr.getProjectModel = function() { return [
 		true
 	]
 ,	[
-		cr.plugins_.Keyboard,
-		true,
+		cr.plugins_.Arr,
+		false,
 		false,
 		false,
 		false,
@@ -13344,7 +13949,7 @@ cr.getProjectModel = function() { return [
 		false
 	]
 ,	[
-		cr.plugins_.Mouse,
+		cr.plugins_.Keyboard,
 		true,
 		false,
 		false,
@@ -13404,7 +14009,7 @@ cr.getProjectModel = function() { return [
 			0,
 			false,
 			[
-				["images/tile-sheet0.png", 158, 0, 0, 36, 42, 1, 0.5, 0.5,[],[-0.333333,-0.357143,0,-0.5,0.333333,-0.357143,0.5,0,0.333333,0.357143,0,0.5,-0.333333,0.357143,-0.5,0],0]
+				["images/tile-sheet0.png", 158, 0, 0, 36, 42, 1, 0.5, 0.5,[],[0.357143,-0.333333,0.5,0,0.357143,0.333333,0,0.5,-0.357143,0.333333,-0.5,0,-0.357143,-0.333333,0,-0.5],0]
 			]
 			]
 		],
@@ -13418,7 +14023,7 @@ cr.getProjectModel = function() { return [
 		"t3",
 		cr.plugins_.Sprite,
 		false,
-		0,
+		1,
 		3,
 		0,
 		null,
@@ -13504,7 +14109,7 @@ cr.getProjectModel = function() { return [
 		"t7",
 		cr.plugins_.TiledBg,
 		false,
-		2,
+		4,
 		0,
 		0,
 		["images/controller.png", 169, 3],
@@ -13517,21 +14122,6 @@ cr.getProjectModel = function() { return [
 	]
 ,	[
 		"t8",
-		cr.plugins_.Text,
-		false,
-		0,
-		0,
-		0,
-		null,
-		null,
-		[
-		],
-		false,
-		false,
-		[]
-	]
-,	[
-		"t9",
 		cr.plugins_.Socket,
 		false,
 		0,
@@ -13547,7 +14137,7 @@ cr.getProjectModel = function() { return [
 		,[]
 	]
 ,	[
-		"t10",
+		"t9",
 		cr.plugins_.Text,
 		false,
 		0,
@@ -13561,6 +14151,21 @@ cr.getProjectModel = function() { return [
 		false,
 		[]
 	]
+,	[
+		"t10",
+		cr.plugins_.Arr,
+		false,
+		0,
+		0,
+		0,
+		null,
+		null,
+		[
+		],
+		true,
+		false,
+		[]
+	]
 	],
 	[
 	],
@@ -13570,7 +14175,7 @@ cr.getProjectModel = function() { return [
 		1645,
 		1295,
 		false,
-		"Event sheet 1",
+		"hexmap events",
 		[
 		[
 			"Layer 0",
@@ -13603,6 +14208,7 @@ cr.getProjectModel = function() { return [
 				[-52, -34, 0, 34, 40, 0, 0, 1, 0.5, 0.5, 0, 0, []],
 				3,
 				[
+					0
 				],
 				[
 				[
@@ -13647,7 +14253,7 @@ cr.getProjectModel = function() { return [
 			]
 ,			[
 				[2, 2, 0, 1020, 30, 0, 0, 1, 0, 0, 0, 0, []],
-				10,
+				9,
 				[
 				],
 				[
@@ -13665,11 +14271,13 @@ cr.getProjectModel = function() { return [
 				]
 			]
 ,			[
-				[1126, 151, 0, 512, 512, 0, 0, 1, 0, 0, 0, 0, []],
+				[1058, 13, 0, 17, 512, 0, 0, 1, 0, 0, 0, 0, []],
 				7,
 				[
-					"",
-					0
+					0,
+					0,
+					0,
+					""
 				],
 				[
 				],
@@ -13703,10 +14311,23 @@ cr.getProjectModel = function() { return [
 				[
 				],
 				[
-					40,
-					40,
+					60,
+					60,
 					36,
 					33
+				]
+			]
+,			[
+				null,
+				10,
+				[
+				],
+				[
+				],
+				[
+					10,
+					1,
+					1
 				]
 			]
 		],
@@ -13717,7 +14338,7 @@ cr.getProjectModel = function() { return [
 		1280,
 		1024,
 		false,
-		"Event sheet 2",
+		null,
 		[
 		[
 			"Layer 0",
@@ -13733,25 +14354,6 @@ cr.getProjectModel = function() { return [
 			0,
 			0,
 			[
-			[
-				[447, 246, 0, 173, 23, 0, 0, 1, 0, 0, 0, 0, []],
-				8,
-				[
-				],
-				[
-				],
-				[
-					"Can't connect to server",
-					0,
-					"12pt Arial",
-					"rgb(0,0,0)",
-					0,
-					0,
-					0,
-					0,
-					0
-				]
-			]
 			],
 			[			]
 		]
@@ -13763,7 +14365,7 @@ cr.getProjectModel = function() { return [
 	],
 	[
 	[
-		"Event sheet 1",
+		"hexmap events",
 		[
 		[
 			2,
@@ -13925,14 +14527,100 @@ cr.getProjectModel = function() { return [
 				]
 				]
 			]
-,			[
+			]
+		]
+,		[
+			0,
+			null,
+			false,
+			[
+			[
+				8,
+				cr.plugins_.Socket.prototype.cnds.IsDataAvailable,
+				null,
+				0,
+				false,
+				false,
+				false
+			]
+			],
+			[
+			[
+				8,
+				cr.plugins_.Socket.prototype.acts.SplitDataReceived,
+				null
+			]
+			]
+			,[
+			[
 				0,
 				null,
 				false,
 				[
+				[
+					-1,
+					cr.system_object.prototype.cnds.Compare,
+					null,
+					0,
+					false,
+					false,
+					false
+					,[
+					[
+						7,
+						[
+							20,
+							8,
+							cr.plugins_.Socket.prototype.exps.LastDataElement,
+							true,
+							null
+							,[
+[
+								0,
+								0
+							]
+							]
+						]
+					]
+,					[
+						8,
+						0
+					]
+,					[
+						7,
+						[
+							2,
+							"I"
+						]
+					]
+					]
+				]
 				],
 				[
 				[
+					9,
+					cr.plugins_.Text.prototype.acts.SetText,
+					null
+					,[
+					[
+						7,
+						[
+							20,
+							8,
+							cr.plugins_.Socket.prototype.exps.LastDataElement,
+							true,
+							null
+							,[
+[
+								0,
+								1
+							]
+							]
+						]
+					]
+					]
+				]
+,				[
 					0,
 					cr.plugins_.Rex_SLGBoard.prototype.acts.CreateChess,
 					null
@@ -13944,15 +14632,45 @@ cr.getProjectModel = function() { return [
 ,					[
 						0,
 						[
-							0,
-							7
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									3
+								]
+								]
+							]
+							]
 						]
 					]
 ,					[
 						0,
 						[
-							0,
-							8
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									4
+								]
+								]
+							]
+							]
 						]
 					]
 ,					[
@@ -13967,6 +14685,510 @@ cr.getProjectModel = function() { return [
 						[
 							0,
 							0
+						]
+					]
+					]
+				]
+,				[
+					7,
+					cr.plugins_.TiledBg.prototype.acts.SetInstanceVar,
+					null
+					,[
+					[
+						10,
+						1
+					]
+,					[
+						7,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									2
+								]
+								]
+							]
+							]
+						]
+					]
+					]
+				]
+,				[
+					7,
+					cr.plugins_.TiledBg.prototype.acts.SetInstanceVar,
+					null
+					,[
+					[
+						10,
+						2
+					]
+,					[
+						7,
+						[
+							20,
+							3,
+							cr.plugins_.Sprite.prototype.exps.UID,
+							false,
+							null
+						]
+					]
+					]
+				]
+,				[
+					10,
+					cr.plugins_.Arr.prototype.acts.SetX,
+					null
+					,[
+					[
+						0,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									1
+								]
+								]
+							]
+							]
+						]
+					]
+,					[
+						7,
+						[
+							20,
+							3,
+							cr.plugins_.Sprite.prototype.exps.UID,
+							false,
+							null
+						]
+					]
+					]
+				]
+				]
+			]
+,			[
+				0,
+				null,
+				false,
+				[
+				[
+					-1,
+					cr.system_object.prototype.cnds.Compare,
+					null,
+					0,
+					false,
+					false,
+					false
+					,[
+					[
+						7,
+						[
+							20,
+							8,
+							cr.plugins_.Socket.prototype.exps.LastDataElement,
+							true,
+							null
+							,[
+[
+								0,
+								0
+							]
+							]
+						]
+					]
+,					[
+						8,
+						0
+					]
+,					[
+						7,
+						[
+							2,
+							"C"
+						]
+					]
+					]
+				]
+,				[
+					7,
+					cr.plugins_.TiledBg.prototype.cnds.CompareInstanceVar,
+					null,
+					0,
+					false,
+					false,
+					false
+					,[
+					[
+						10,
+						1
+					]
+,					[
+						8,
+						1
+					]
+,					[
+						7,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									1
+								]
+								]
+							]
+							]
+						]
+					]
+					]
+				]
+				],
+				[
+				[
+					-1,
+					cr.system_object.prototype.acts.CreateObject,
+					null
+					,[
+					[
+						4,
+						3
+					]
+,					[
+						5,
+						[
+							0,
+							0
+						]
+					]
+,					[
+						0,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									2
+								]
+								]
+							]
+							]
+						]
+					]
+,					[
+						0,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									3
+								]
+								]
+							]
+							]
+						]
+					]
+					]
+				]
+,				[
+					3,
+					cr.plugins_.Sprite.prototype.acts.SetInstanceVar,
+					null
+					,[
+					[
+						10,
+						0
+					]
+,					[
+						7,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									1
+								]
+								]
+							]
+							]
+						]
+					]
+					]
+				]
+,				[
+					10,
+					cr.plugins_.Arr.prototype.acts.SetX,
+					null
+					,[
+					[
+						0,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									1
+								]
+								]
+							]
+							]
+						]
+					]
+,					[
+						7,
+						[
+							0,
+							0
+						]
+					]
+					]
+				]
+				]
+			]
+,			[
+				0,
+				null,
+				false,
+				[
+				[
+					-1,
+					cr.system_object.prototype.cnds.Compare,
+					null,
+					0,
+					false,
+					false,
+					false
+					,[
+					[
+						7,
+						[
+							20,
+							8,
+							cr.plugins_.Socket.prototype.exps.LastDataElement,
+							true,
+							null
+							,[
+[
+								0,
+								0
+							]
+							]
+						]
+					]
+,					[
+						8,
+						0
+					]
+,					[
+						7,
+						[
+							2,
+							"UM"
+						]
+					]
+					]
+				]
+				],
+				[
+				]
+				,[
+				[
+					0,
+					null,
+					false,
+					[
+					[
+						7,
+						cr.plugins_.TiledBg.prototype.cnds.CompareInstanceVar,
+						null,
+						0,
+						false,
+						false,
+						false
+						,[
+						[
+							10,
+							1
+						]
+,						[
+							8,
+							1
+						]
+,						[
+							7,
+							[
+								19,
+								cr.system_object.prototype.exps["int"]
+								,[
+[
+									20,
+									8,
+									cr.plugins_.Socket.prototype.exps.LastDataElement,
+									true,
+									null
+									,[
+[
+										0,
+										1
+									]
+									]
+								]
+								]
+							]
+						]
+						]
+					]
+,					[
+						3,
+						cr.plugins_.Sprite.prototype.cnds.PickByUID,
+						null,
+						0,
+						false,
+						false,
+						false
+						,[
+						[
+							0,
+							[
+								20,
+								10,
+								cr.plugins_.Arr.prototype.exps.At,
+								false,
+								null
+								,[
+[
+									19,
+									cr.system_object.prototype.exps["int"]
+									,[
+[
+										20,
+										8,
+										cr.plugins_.Socket.prototype.exps.LastDataElement,
+										true,
+										null
+										,[
+[
+											0,
+											1
+										]
+										]
+									]
+									]
+								]
+								]
+							]
+						]
+						]
+					]
+					],
+					[
+					[
+						3,
+						cr.plugins_.Sprite.prototype.acts.SetPos,
+						null
+						,[
+						[
+							0,
+							[
+								19,
+								cr.system_object.prototype.exps["int"]
+								,[
+[
+									20,
+									8,
+									cr.plugins_.Socket.prototype.exps.LastDataElement,
+									true,
+									null
+									,[
+[
+										0,
+										2
+									]
+									]
+								]
+								]
+							]
+						]
+,						[
+							0,
+							[
+								19,
+								cr.system_object.prototype.exps["int"]
+								,[
+[
+									20,
+									8,
+									cr.plugins_.Socket.prototype.exps.LastDataElement,
+									true,
+									null
+									,[
+[
+										0,
+										3
+									]
+									]
+								]
+								]
+							]
+						]
 						]
 					]
 					]
@@ -14261,6 +15483,41 @@ cr.getProjectModel = function() { return [
 			]
 			]
 		]
+,		[
+			0,
+			null,
+			false,
+			[
+			[
+				4,
+				cr.plugins_.Keyboard.prototype.cnds.IsKeyDown,
+				null,
+				0,
+				false,
+				false,
+				false
+				,[
+				[
+					9,
+					39
+				]
+				]
+			]
+			],
+			[
+			[
+				3,
+				cr.behaviors.Rex_GridMove.prototype.acts.MoveToNeighbor,
+				"GridMove"
+				,[
+				[
+					3,
+					0
+				]
+				]
+			]
+			]
+		]
 		]
 	]
 ,	[
@@ -14289,7 +15546,7 @@ cr.getProjectModel = function() { return [
 				,[
 				[
 					10,
-					0
+					3
 				]
 ,				[
 					7,
@@ -14307,7 +15564,7 @@ cr.getProjectModel = function() { return [
 				,[
 				[
 					10,
-					1
+					0
 				]
 ,				[
 					7,
@@ -14319,7 +15576,7 @@ cr.getProjectModel = function() { return [
 				]
 			]
 ,			[
-				9,
+				8,
 				cr.plugins_.Socket.prototype.acts.Connect,
 				null
 				,[
@@ -14330,7 +15587,7 @@ cr.getProjectModel = function() { return [
 						7,
 						true,
 						null
-						,0
+						,3
 					]
 				]
 ,				[
@@ -14340,111 +15597,13 @@ cr.getProjectModel = function() { return [
 						7,
 						false,
 						null
-						,1
+						,0
 					]
 				]
 				]
 			]
 			]
 		]
-,		[
-			0,
-			null,
-			false,
-			[
-			[
-				9,
-				cr.plugins_.Socket.prototype.cnds.IsDataAvailable,
-				null,
-				0,
-				false,
-				false,
-				false
-			]
-			],
-			[
-			[
-				9,
-				cr.plugins_.Socket.prototype.acts.SplitDataReceived,
-				null
-			]
-			]
-		]
-,		[
-			0,
-			null,
-			false,
-			[
-			[
-				-1,
-				cr.system_object.prototype.cnds.Compare,
-				null,
-				0,
-				false,
-				false,
-				false
-				,[
-				[
-					7,
-					[
-						20,
-						9,
-						cr.plugins_.Socket.prototype.exps.LastDataElement,
-						true,
-						null
-						,[
-[
-							0,
-							0
-						]
-						]
-					]
-				]
-,				[
-					8,
-					0
-				]
-,				[
-					7,
-					[
-						2,
-						"I"
-					]
-				]
-				]
-			]
-			],
-			[
-			[
-				10,
-				cr.plugins_.Text.prototype.acts.SetText,
-				null
-				,[
-				[
-					7,
-					[
-						20,
-						9,
-						cr.plugins_.Socket.prototype.exps.LastDataElement,
-						true,
-						null
-						,[
-[
-							0,
-							1
-						]
-						]
-					]
-				]
-				]
-			]
-			]
-		]
-		]
-	]
-,	[
-		"Event sheet 2",
-		[
 		]
 	]
 	],
