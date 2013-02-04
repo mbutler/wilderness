@@ -14,15 +14,15 @@ io.sockets.on("connection", function (socket) {
     var mySelf = entities[myNumber] = [myNumber, INITIAL_X, INITIAL_Y];
 
     //Send the initial position and ID to connecting player
-    console.log('I,' + 'You have entered the wilderness,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
-    socket.send('I,' + 'You have entered the wilderness,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
+    console.log(myNumber + ' sent: ' + 'I,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
+    socket.send('I,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
     //Send to conencting client the current state of all the other players
     for (var entity_idx = 0; entity_idx < entities.length; entity_idx++) { //send initial update  
         if (entity_idx != myNumber) {
             entity = entities[entity_idx];
             if (typeof (entity) != "undefined" && entity != null) {
 
-                console.log(myNumber + ' sent: C for ' + entity_idx);
+                console.log(myNumber + ' sent a C for ' + entity_idx + ' ' + entity);
                 socket.send('C,' + entity[0] + ',' + entity[1] + ',' + entity[2]); //send the client that just connected the position of all the other clients 
             }
         }
@@ -35,13 +35,12 @@ io.sockets.on("connection", function (socket) {
         //    console.log(myNumber + ' sent: ' +data);
         var new_data = data.split(',');
         if (new_data[0] == 'UM') {
-            mySelf[1] = new_data[1];
-            mySelf[2] = new_data[2];
-            mySelf[3] = new_data[3];
-            mySelf[4] = new_data[4];
+            mySelf[1] = new_data[2];
+            mySelf[2] = new_data[3];
+
             //Update all the other clients about my update
             socket.broadcast.emit("message",
-			'UM,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2] + ',' + mySelf[3] + ',' + mySelf[4]);
+			'UM,' + mySelf[0] + ',' + mySelf[1] + ',' + mySelf[2]);
         }
         else if (new_data[0] == 'S') { // a s message
             var shoot_info = [];
@@ -51,8 +50,7 @@ io.sockets.on("connection", function (socket) {
             shoot_info[2] = new_data[3]; //degrees
 
             //Update all the other clients about my update
-            socket.broadcast.emit("message",
-			'S,' + mySelf[0] + ',' + shoot_info[0] + ',' + shoot_info[1] + ',' + shoot_info[2]);
+            socket.broadcast.emit("message",'S,' + mySelf[0] + ',' + shoot_info[0] + ',' + shoot_info[1] + ',' + shoot_info[2]);
         }
     });
 
