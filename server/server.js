@@ -22,7 +22,7 @@ io.sockets.on("connection", function (socket) {
             entity = entities[entity_idx];
             if (typeof (entity) != "undefined" && entity != null) {
 
-                console.log(myNumber + ' sent a C for ' + entity_idx + ' ' + entity);
+                console.log(myNumber + ' sent a C to ' + entity_idx + ': ' + entity);
                 socket.send('C,' + entity[0] + ',' + entity[1] + ',' + entity[2]); //send the client that just connected the position of all the other clients 
             }
         }

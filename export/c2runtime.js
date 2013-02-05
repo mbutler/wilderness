@@ -11061,7 +11061,7 @@ cr.plugins_.Rex_SLGHexTx = function(runtime)
 	};
 }());
 /*! Socket.IO.min.js build:0.8.7, production. Copyright(c) 2011 LearnBoost <dev@learnboost.com> MIT Licensed */
-document.write("<script src='socket.io.min.js'><\/script>");
+document.write("<script src='socket.io.js'><\/script>");
 ;
 ;
 cr.plugins_.Socket = function(runtime)
@@ -11089,6 +11089,7 @@ cr.plugins_.Socket = function(runtime)
 		this.lastPort = 80;
 		this.socket = null;
 		this.LastDataArray = [];
+		this.lastEvent ="";
 	};
 	var instanceProto = pluginProto.Instance.prototype;
 	instanceProto.onCreate = function()
@@ -11098,66 +11099,78 @@ cr.plugins_.Socket = function(runtime)
 	{
 		var socket = this.socket;
 		if(socket != null)
-			socket["send"](data);
-	};
-	instanceProto.emit = function(ent,data)
-	{
-		var socket = this.socket;
-		if(socket != null)
-			socket["emit"](ent,data);
+			socket.send(data);
 	};
 	instanceProto.disconnect = function()
 	{
 		var socket = this.socket;
 		if(socket != null)
-			socket["disconnect"]();
+			socket.disconnect();
 	};
     var MAX_SLOTS_FOR_DATA = 100;
 	instanceProto.connect = function(host,port)
 	{
 		var socket = this.socket;
-		if(socket != undefined || socket != null)
-			socket["disconnect"]();
+		if(socket != null)
+			socket.disconnect();
 		this.lastAddress = host;
 		this.lastPort = port;
-		socket = window["io"]["connect"]('http://' + host + ':' + port, {'force new connection': true});
+		socket =  io.connect('http://' + host + ':' + port,{'force new connection': true});
 		this.socket = socket;
 		var instance = this;
 		var runtime = instance.runtime;
-		socket["on"]
+		socket.on
 		(
-			'message',
+			"message",
 			function(data)
 			{
 				instance.dataStack.push(data);
 				runtime.trigger(pluginProto.cnds.OnData,instance);
 			}
 		);
-		socket["on"]
+		socket.on
 		(
-			'connect_failed',
+			"connect_failed",
 			function(event)
 			{
 				runtime.trigger(pluginProto.cnds.OnError,instance);
 			}
 		);
-		socket["on"]
+		socket.on
 		(
-			'connect',
+			"connect",
 			function(event)
 			{
 				runtime.trigger(pluginProto.cnds.OnConnect,instance);
 			}
 		);
-		socket["on"]
+		socket.on
 		(
-			'disconnect',
+			"disconnect",
 			function()
 			{
 				runtime.trigger(pluginProto.cnds.OnDisconnect,instance);
 				this.socket = null;
 			}
 		);
+		(function() {
+			var $emit = socket.$emit;
+			socket.$emit = function()
+			{
+					instance.lastEvent = arguments[0].toString();
+					if (typeof arguments[1] === "undefined")
+						arguments[1] = "";
+					instance.dataStack.push(arguments[1].toString());
+					runtime.trigger(pluginProto.cnds.OnData,instance);
+					runtime.trigger(pluginProto.cnds.OnAnyEvent,instance);
+			};
+			})();
+	};
+	instanceProto.emit = function(ent,data)
+	{
+		var socket = this.socket;
+		if(socket != null)
+			socket.emit(ent,data);
 	};
 	pluginProto.cnds = {};
 	var cnds = pluginProto.cnds;
@@ -11180,6 +11193,16 @@ cr.plugins_.Socket = function(runtime)
 	cnds.IsDataAvailable = function () {
 	    return (this.dataStack.length > 0);
 	};
+	cnds.OnEvent = function(myEvent)
+	{
+			myEvent = myEvent.toString();
+			if (myEvent == this.lastEvent)
+				return true;
+	};
+	cnds.OnAnyEvent = function()
+	{
+		return true;
+	};
 	pluginProto.acts = {};
 	var acts = pluginProto.acts;
 	acts.Connect = function(host,port)
@@ -11193,12 +11216,6 @@ cr.plugins_.Socket = function(runtime)
 		data = data.toString();
 		this.send(data);
 	};
-	acts.Emit = function(ent,data)
-	{
-		data = data.toString();
-		ent = ent.toString();
-		this.emit(ent,data);
-	};
 	acts.Disconnect = function()
 	{
 		this.disconnect();
@@ -11206,6 +11223,12 @@ cr.plugins_.Socket = function(runtime)
 	acts.SplitDataReceived = function () {
 	    var oldest_data = get_last_data(this.dataStack);
 	    this.LastDataArray = oldest_data.split(',');
+	};
+	acts.Emit = function(ent,data)
+	{
+	    data = data.toString();
+		ent = ent.toString();
+		this.emit(ent,data);
 	};
 	pluginProto.exps = {};
 	var exps = pluginProto.exps;
@@ -11244,6 +11267,10 @@ cr.plugins_.Socket = function(runtime)
 		if (index < this.LastDataArray.length)
 			element = this.LastDataArray[index];
 		ret.set_string(element);
+	};
+	exps.LastSocketEvent = function (result)
+	{
+		result.set_string(this.lastEvent);
 	};
 }());
 ;
@@ -13826,30 +13853,6 @@ cr.getProjectModel = function() { return [
 	null,
 	[
 	[
-		cr.plugins_.Arr,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false
-	]
-,	[
-		cr.plugins_.Keyboard,
-		true,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false
-	]
-,	[
 		cr.plugins_.Mouse,
 		true,
 		false,
@@ -13932,6 +13935,30 @@ cr.getProjectModel = function() { return [
 		true,
 		true,
 		true
+	]
+,	[
+		cr.plugins_.Arr,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false
+	]
+,	[
+		cr.plugins_.Keyboard,
+		true,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false
 	]
 	],
 	[
@@ -14573,6 +14600,39 @@ cr.getProjectModel = function() { return [
 				],
 				[
 				[
+					7,
+					cr.plugins_.TiledBg.prototype.acts.SetInstanceVar,
+					null
+					,[
+					[
+						10,
+						1
+					]
+,					[
+						7,
+						[
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								20,
+								8,
+								cr.plugins_.Socket.prototype.exps.LastDataElement,
+								true,
+								null
+								,[
+[
+									0,
+									1
+								]
+								]
+							]
+							]
+						]
+					]
+					]
+				]
+,				[
 					0,
 					cr.plugins_.Rex_SLGBoard.prototype.acts.CreateChess,
 					null
@@ -14628,30 +14688,55 @@ cr.getProjectModel = function() { return [
 ,					[
 						7,
 						[
-							0,
-							1
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								21,
+								7,
+								false,
+								null
+								,1
+							]
+							]
 						]
 					]
 ,					[
 						7,
 						[
-							21,
-							7,
-							false,
-							null
-							,1
+							19,
+							cr.system_object.prototype.exps["int"]
+							,[
+[
+								21,
+								7,
+								false,
+								null
+								,1
+							]
+							]
 						]
 					]
 					]
 				]
 ,				[
-					3,
-					cr.plugins_.Sprite.prototype.acts.SetCollisions,
+					7,
+					cr.plugins_.TiledBg.prototype.acts.SetInstanceVar,
 					null
 					,[
 					[
-						3,
-						0
+						10,
+						2
+					]
+,					[
+						7,
+						[
+							20,
+							3,
+							cr.plugins_.Sprite.prototype.exps.UID,
+							false,
+							null
+						]
 					]
 					]
 				]
@@ -14684,60 +14769,6 @@ cr.getProjectModel = function() { return [
 								]
 							]
 							]
-						]
-					]
-					]
-				]
-,				[
-					7,
-					cr.plugins_.TiledBg.prototype.acts.SetInstanceVar,
-					null
-					,[
-					[
-						10,
-						1
-					]
-,					[
-						7,
-						[
-							19,
-							cr.system_object.prototype.exps["int"]
-							,[
-[
-								20,
-								8,
-								cr.plugins_.Socket.prototype.exps.LastDataElement,
-								true,
-								null
-								,[
-[
-									0,
-									1
-								]
-								]
-							]
-							]
-						]
-					]
-					]
-				]
-,				[
-					7,
-					cr.plugins_.TiledBg.prototype.acts.SetInstanceVar,
-					null
-					,[
-					[
-						10,
-						2
-					]
-,					[
-						7,
-						[
-							20,
-							3,
-							cr.plugins_.Sprite.prototype.exps.UID,
-							false,
-							null
 						]
 					]
 					]
