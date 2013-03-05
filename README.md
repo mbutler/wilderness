@@ -16,7 +16,7 @@ Behavior 'Grid Move' by Rex.Rainbow
 
 Before running, install socket.io in main directory. npm install socket.io
 
-Upload contents of /server and /samples to a web directory. 
+Upload contents of /server and /export to a web directory. Export any new changes in Construct 2 to /export.
 
 Start server with 'node server.js'
 
